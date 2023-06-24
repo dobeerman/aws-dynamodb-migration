@@ -13,8 +13,8 @@ import {
   ScanCommandInput,
   ScanCommandOutput
 } from "@aws-sdk/client-dynamodb";
+import { Config } from "../dtos/config";
 import { LambdaEvent } from "../dtos/lambdaEvent";
-import { RetryDetails } from "../dtos/retryDetails";
 
 export class DynamoDBModule {
   private readonly scanInput: Pick<ScanCommandInput, "Select" | "ReturnConsumedCapacity" | "Limit"> = {
@@ -25,14 +25,14 @@ export class DynamoDBModule {
   constructor(
     private readonly client: DynamoDBClient,
     private readonly logger: Logger,
-    private readonly retryDetails: RetryDetails = { delayInMs: 100, retryLimit: 10, scanLimit: 1000 },
+    private readonly config: Config = { delayInMs: 100, retryLimit: 10, scanLimit: 1000 },
   ) {
-    this.scanInput.Limit = this.retryDetails.scanLimit;
+    this.scanInput.Limit = this.config.scanLimit;
   }
 
   public async cleanupDestinationTable(event: LambdaEvent): Promise<void> {
     if (!event.cleanupDestinationTable) {
-      this.logger.debug("Cleanup destination table is not enabled");
+      this.logger.debug("Skipping cleanup of destination table");
       return;
     }
 
@@ -60,7 +60,7 @@ export class DynamoDBModule {
 
   public async migrate(event: LambdaEvent): Promise<void> {
     if (!event.migrate) {
-      this.logger.debug("Migrate is not enabled");
+      this.logger.debug("Skipping migration of data");
       return;
     }
 
@@ -92,14 +92,6 @@ export class DynamoDBModule {
     }
   }
 
-  private async describeTable(tableName: string): Promise<DescribeTableCommandOutput> {
-    const input: DescribeTableCommandInput = { TableName: tableName };
-
-    const command = new DescribeTableCommand(input);
-
-    return await this.client.send(command);
-  }
-
   protected async delay(ms: number, attempt: number): Promise<void> {
     const exponentialDelay = ms * (2 * attempt);
 
@@ -108,9 +100,17 @@ export class DynamoDBModule {
     return new Promise(resolve => setTimeout(resolve, randomDelay));
   }
 
+  private async describeTable(tableName: string): Promise<DescribeTableCommandOutput> {
+    const input: DescribeTableCommandInput = { TableName: tableName };
+
+    const command = new DescribeTableCommand(input);
+
+    return await this.client.send(command);
+  }
+
   private async batchWriteWithRetry(batchWriteItemInput: BatchWriteItemInput, retryCount: number = 0,): Promise<BatchWriteItemOutput> {
     if (retryCount > 0) {
-      await this.delay(this.retryDetails.delayInMs, retryCount);
+      await this.delay(this.config.delayInMs, retryCount);
     }
 
     const command: BatchWriteItemCommand = new BatchWriteItemCommand(batchWriteItemInput);
@@ -119,7 +119,7 @@ export class DynamoDBModule {
 
     const unprocessedItems: string[] = Object.keys(batchResponse.UnprocessedItems ?? {});
 
-    if (unprocessedItems.length !== 0 && retryCount < this.retryDetails.retryLimit) {
+    if (unprocessedItems.length !== 0 && retryCount < this.config.retryLimit) {
       this.logger.warn(`UnprocessedItems.length: ${unprocessedItems.length}.`);
 
       retryCount++;
@@ -129,7 +129,7 @@ export class DynamoDBModule {
       return response;
     }
 
-    if (unprocessedItems.length !== 0 && retryCount === this.retryDetails.retryLimit) {
+    if (unprocessedItems.length !== 0 && retryCount === this.config.retryLimit) {
       this.logger.error(`Retry limit reached. UnprocessedItems.length: ${unprocessedItems.length}.`);
     }
 
