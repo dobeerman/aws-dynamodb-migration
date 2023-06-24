@@ -1,0 +1,6 @@
+{
+  "cleanupDestinationTable": true,
+  "migrate": true,
+  "sourceTableName": "source-table",
+  "destinationTableName": "destination-table"
+}
