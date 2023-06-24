@@ -7,7 +7,7 @@
   "scripts": {
     "build": "tsc",
     "watch": "tsc -w",
-    "test": "jest",
+    "test": "jest --maxWorkers=4 --coverage --no-cache --passWithNoTests",
     "cdk": "cdk"
   },
   "devDependencies": {

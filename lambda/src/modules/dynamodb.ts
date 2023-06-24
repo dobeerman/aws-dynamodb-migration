@@ -32,7 +32,7 @@ export class DynamoDBModule {
 
   public async cleanupDestinationTable(event: LambdaEvent): Promise<void> {
     if (!event.cleanupDestinationTable) {
-      this.logger.debug("Cleanup destination table is not enabled");
+      this.logger.debug("Skipping cleanup of destination table");
       return;
     }
 
@@ -60,7 +60,7 @@ export class DynamoDBModule {
 
   public async migrate(event: LambdaEvent): Promise<void> {
     if (!event.migrate) {
-      this.logger.debug("Migrate is not enabled");
+      this.logger.debug("Skipping migration of data");
       return;
     }
 
